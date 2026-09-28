@@ -1,10 +1,44 @@
 {
-  "agent_id": "replace-with-a-random-agent-id",
-  "server_url": "http://127.0.0.1:8000",
-  "poll_seconds": 3,
+  "agent_id": "your-windows-agent",
+  "cloud_url": "https://your-vercel-domain.vercel.app",
+  "agent_token": "PUT_AGENT_API_TOKEN_HERE",
+  "poll_seconds": 5,
+  "request_timeout_seconds": 20,
+  "heartbeat_interval_seconds": 30,
   "allowed_roots": [
-    "C:\\Users\\YOUR_USER\\Downloads"
+    "C:/Users/YOUR_USER/Downloads/PrintTest"
   ],
   "max_files_per_job": 50,
-  "printer_name": "Brother HL-L2400D"
+  "printer_name": "Brother HL-L2400D",
+  "default_print_rules": {
+    "pdf": {
+      "paper": "A4",
+      "duplex": true,
+      "portrait_edge": "long",
+      "landscape_edge": "short"
+    },
+    "xlsx": {
+      "paper": "Legal",
+      "duplex": true,
+      "edge": "short"
+    },
+    "xls": {
+      "paper": "Legal",
+      "duplex": true,
+      "edge": "short"
+    },
+    "xlsm": {
+      "paper": "Legal",
+      "duplex": true,
+      "edge": "short"
+    },
+    "docx": {
+      "paper": "A4",
+      "duplex": false
+    },
+    "doc": {
+      "paper": "A4",
+      "duplex": false
+    }
+  }
 }
