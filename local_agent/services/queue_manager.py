@@ -20,6 +20,7 @@ class PrintItem:
     settings: dict
     status: JobStatus = JobStatus.QUEUED
     error: str | None = None
+    printer_job_id: int | None = None
 
 
 @dataclass
@@ -29,14 +30,13 @@ class PrintQueue:
     def add(self, item: PrintItem) -> None:
         self.items.append(item)
 
-    def run(self, print_one: Callable[[PrintItem], None]) -> None:
+    def run(self, print_one: Callable[[PrintItem], int | None]) -> None:
         for item in self.items:
             if item.status == JobStatus.CANCELLED:
                 continue
-
             item.status = JobStatus.PRINTING
             try:
-                print_one(item)
+                item.printer_job_id = print_one(item)
                 item.status = JobStatus.COMPLETED
             except Exception as exc:
                 item.status = JobStatus.FAILED
