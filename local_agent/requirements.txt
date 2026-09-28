@@ -1,6 +1,5 @@
-fastapi
-uvicorn[standard]
-pydantic
-pymupdf
-pywin32
-pytest
+httpx>=0.27,<1
+PyMuPDF>=1.24,<2
+pywin32>=306
+Pillow>=11,<14
+pytest>=8,<9
