@@ -1,0 +1,10 @@
+{
+  "agent_id": "replace-with-a-random-agent-id",
+  "server_url": "http://127.0.0.1:8000",
+  "poll_seconds": 3,
+  "allowed_roots": [
+    "C:\\Users\\YOUR_USER\\Downloads"
+  ],
+  "max_files_per_job": 50,
+  "printer_name": "Brother HL-L2400D"
+}
