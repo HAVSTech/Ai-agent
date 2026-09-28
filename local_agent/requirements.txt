@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic
+pymupdf
+pywin32
+pytest
