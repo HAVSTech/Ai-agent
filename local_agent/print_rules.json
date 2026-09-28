@@ -1,0 +1,17 @@
+{
+  "pdf": {
+    "default_paper": "A4",
+    "default_duplex": true,
+    "portrait_edge": "long",
+    "landscape_edge": "short"
+  },
+  "xlsx": {
+    "default_paper": "Legal",
+    "default_duplex": true,
+    "duplex_edge": "short"
+  },
+  "docx": {
+    "default_paper": "A4",
+    "default_duplex": false
+  }
+}
