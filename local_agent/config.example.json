@@ -5,6 +5,7 @@
   "poll_seconds": 5,
   "request_timeout_seconds": 20,
   "heartbeat_interval_seconds": 30,
+  "spool_wait_seconds": 120,
   "allowed_roots": [
     "C:/Users/YOUR_USER/Downloads/PrintTest"
   ],
