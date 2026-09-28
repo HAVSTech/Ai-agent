@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import fitz
+    import pymupdf
 except ImportError:  # pragma: no cover
-    fitz = None
+    pymupdf = None
 
 
 def _pdf_orientation(width: float, height: float) -> str:
@@ -28,10 +28,10 @@ class DocumentAnalyzer:
         }
 
     def _analyze_pdf(self, path: Path) -> dict[str, Any]:
-        if fitz is None:
+        if pymupdf is None:
             raise RuntimeError("PyMuPDF is required for PDF analysis")
 
-        with fitz.open(path) as document:
+        with pymupdf.open(path) as document:
             pages = len(document)
             if pages:
                 rect = document[0].rect
