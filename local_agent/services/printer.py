@@ -1,56 +1,47 @@
 from __future__ import annotations
 
-import os
-import subprocess
 from pathlib import Path
+from typing import Any
 
-try:
-    import win32print
-except ImportError:  # pragma: no cover
-    win32print = None
+from .office_converter import OfficeConverter
+from .print_engine import WindowsPrintEngine
 
 
 class WindowsPrinter:
-    def __init__(self, printer_name: str | None = None) -> None:
-        self.printer_name = printer_name or self.default_printer()
+    def __init__(self, printer_name: str | None = None, spool_wait_seconds: int = 120):
+        if not printer_name:
+            import win32print
+            printer_name = win32print.GetDefaultPrinter()
+        self.printer_name = printer_name
+        self.engine = WindowsPrintEngine(printer_name, spool_wait_seconds)
+        self.office = OfficeConverter()
 
-    @staticmethod
-    def default_printer() -> str:
-        if win32print is None:
-            return "DEFAULT"
-        return win32print.GetDefaultPrinter()
+    def printer_status(self) -> dict[str, Any]:
+        import win32print
+        handle = win32print.OpenPrinter(self.printer_name)
+        try:
+            info = win32print.GetPrinter(handle, 2)
+            return {
+                "name": self.printer_name,
+                "status": info.get("Status", 0),
+                "jobs": info.get("cJobs", 0),
+                "port": info.get("pPortName"),
+            }
+        finally:
+            win32print.ClosePrinter(handle)
 
-    def printer_status(self) -> dict:
-        return {
-            "name": self.printer_name,
-            "platform": os.name,
-            "ready_check": "basic",
-        }
+    def print_file(self, path: Path, settings: dict[str, Any]) -> int:
+        suffix = path.suffix.lower()
+        pdf_path = path
+        converted = False
+        try:
+            if suffix in {".doc", ".docx", ".xls", ".xlsx", ".xlsm"}:
+                pdf_path = self.office.convert(path)
+                converted = True
+            elif suffix != ".pdf":
+                raise ValueError(f"Unsupported print type: {suffix}")
 
-    def print_file(self, path: Path, settings: dict) -> None:
-        if os.name != "nt":
-            raise RuntimeError("The print engine must run on Windows")
-
-        # Windows PowerShell needs paths containing spaces to be quoted.
-        # Use single-quoted PowerShell literals and escape embedded apostrophes.
-        file_path = str(path).replace("'", "''")
-        printer_name = self.printer_name.replace("'", "''")
-
-        command = (
-            f"Start-Process -FilePath '{file_path}' "
-            f"-Verb PrintTo -ArgumentList @('{printer_name}') "
-            f"-PassThru | ForEach-Object {{ $_.WaitForExit() }}"
-        )
-
-        subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                command,
-            ],
-            check=True,
-        )
+            return self.engine.print_pdf(pdf_path, settings)
+        finally:
+            if converted:
+                self.office.cleanup(pdf_path)
