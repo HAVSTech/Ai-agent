@@ -4,8 +4,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Header, HTTPException, Response
-from pydantic import ValidationError
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 
 from .ai import PrintPlanner
 from .config import Settings
@@ -15,14 +14,13 @@ from .store import StoreError, SupabaseStore
 
 LOG = logging.getLogger("ai_print_cloud")
 app = FastAPI(title="AI Print Agent Cloud API", version="1.0.0")
-settings = Settings.from_env()
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def store() -> SupabaseStore:
+def get_store() -> SupabaseStore:
     try:
         return SupabaseStore(Settings.from_env())
     except StoreError as exc:
@@ -35,7 +33,7 @@ def health() -> dict:
     db_ok = False
     if current.database_configured:
         try:
-            db_ok = SupabaseStore(current).health()
+            db_ok = get_store().health()
         except Exception:
             db_ok = False
     return {
@@ -49,9 +47,12 @@ def health() -> dict:
 
 
 @app.post("/api/agents/heartbeat")
-def heartbeat(body: AgentHeartbeat, _: None = require_agent_token) -> dict:
+def heartbeat(
+    body: AgentHeartbeat,
+    _: None = Depends(require_agent_token),
+) -> dict:
     try:
-        store().heartbeat(body.agent_id, body.agent_version, body.capabilities)
+        get_store().heartbeat(body.agent_id, body.agent_version, body.capabilities)
     except StoreError as exc:
         LOG.exception("Heartbeat failed")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -61,14 +62,9 @@ def heartbeat(body: AgentHeartbeat, _: None = require_agent_token) -> dict:
 @app.post("/api/jobs")
 def create_job(
     body: CreateJob,
-    authorization: str | None = Header(default=None),
+    _: None = Depends(require_command_token),
 ) -> dict:
-    # This endpoint is for trusted command clients. It intentionally does not
-    # accept the agent token unless COMMAND_API_TOKEN is configured separately.
-    from .security import require_command_token
-    require_command_token(authorization)
-
-    db = store()
+    db = get_store()
     if not db.agent_exists(body.agent_id):
         raise HTTPException(status_code=400, detail="Agent has not connected yet")
 
@@ -101,23 +97,18 @@ def create_job(
 @app.post("/api/commands")
 def command(
     body: CommandRequest,
-    authorization: str | None = Header(default=None),
+    _: None = Depends(require_command_token),
 ) -> dict:
-    require_command_token(authorization)
     current = Settings.from_env()
-
     if len(body.command) > current.max_command_length:
         raise HTTPException(status_code=413, detail="Command is too long")
 
-    db = store()
+    db = get_store()
     if not db.agent_exists(body.agent_id):
         raise HTTPException(status_code=400, detail="Agent has not connected yet")
 
-    planner = PrintPlanner(current)
     try:
-        intent = planner.plan(body.command, body.folder_hint)
-    except ValidationError as exc:
-        raise HTTPException(status_code=502, detail="AI returned an invalid print plan") from exc
+        intent = PrintPlanner(current).plan(body.command, body.folder_hint)
     except Exception as exc:
         LOG.exception("AI planning failed")
         raise HTTPException(status_code=502, detail=f"AI planning failed: {exc}") from exc
@@ -162,10 +153,13 @@ def command(
 
 
 @app.post("/api/agents/jobs/claim")
-def claim_job(body: AgentRequest, _: None = require_agent_token) -> Response:
+def claim_job(
+    body: AgentRequest,
+    _: None = Depends(require_agent_token),
+) -> Response:
     current = Settings.from_env()
     try:
-        job = store().claim_job(body.agent_id, current.job_lease_seconds)
+        job = get_store().claim_job(body.agent_id, current.job_lease_seconds)
     except StoreError as exc:
         LOG.exception("Job claim failed")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -175,9 +169,12 @@ def claim_job(body: AgentRequest, _: None = require_agent_token) -> Response:
 
 
 @app.post("/api/agents/jobs/report")
-def report_job(body: ReportJob, _: None = require_agent_token) -> dict:
+def report_job(
+    body: ReportJob,
+    _: None = Depends(require_agent_token),
+) -> dict:
     try:
-        store().report_job(body.agent_id, body.job_id, body.status, body.result, body.error)
+        get_store().report_job(body.agent_id, body.job_id, body.status, body.result, body.error)
     except StoreError as exc:
         LOG.exception("Job report failed")
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -187,12 +184,10 @@ def report_job(body: ReportJob, _: None = require_agent_token) -> dict:
 @app.get("/api/jobs/{job_id}")
 def get_job(
     job_id: str,
-    authorization: str | None = Header(default=None),
+    _: None = Depends(require_command_token),
 ) -> dict:
-    # Status is exposed to trusted command clients, not to the agent token.
-    require_command_token(authorization)
     try:
-        job = store().get_job(job_id)
+        job = get_store().get_job(job_id)
     except StoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if not job:
