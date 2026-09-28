@@ -31,12 +31,26 @@ class WindowsPrinter:
         if os.name != "nt":
             raise RuntimeError("The print engine must run on Windows")
 
-        # MVP: ask Windows to use the installed application's default print action.
-        # We intentionally keep this simple until printer-specific settings are
-        # verified against the Brother driver installed on the target machine.
+        # Windows PowerShell needs paths containing spaces to be quoted.
+        # Use single-quoted PowerShell literals and escape embedded apostrophes.
+        file_path = str(path).replace("'", "''")
+        printer_name = self.printer_name.replace("'", "''")
+
+        command = (
+            f"Start-Process -FilePath '{file_path}' "
+            f"-Verb PrintTo -ArgumentList @('{printer_name}') "
+            f"-PassThru | ForEach-Object {{ $_.WaitForExit() }}"
+        )
+
         subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             "Start-Process", "-FilePath", str(path), "-Verb", "PrintTo",
-             "-ArgumentList", self.printer_name],
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+            ],
             check=True,
         )
